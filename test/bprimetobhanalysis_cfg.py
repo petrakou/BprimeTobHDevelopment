@@ -5,7 +5,7 @@ from FWCore.ParameterSet.VarParsing import VarParsing
 #from BprimebHAnalysis.BprimeTobHAnalysis.bprimetobhanalysis_cfi import *
 #from BprimebHAnalysis.BprimeTobHAnalysis.TTJets_Hadronic.TTJets_Hadronic_00_cfi import *
 #from BprimebHAnalysis.BprimeTobHAnalysis.BpBpToBHTWinc.BprimeBprimeTobHtWinc_M_1000_cfi import *
-from BprimebHAnalysis.BprimeTobHAnalysis.BpBpToBHTWinc.BprimeBprimeTobHtWinc_M_1500_cfi import *
+from Bprime_kit.BprimeTobHDevelopment.BpBpToBHTWinc.BprimeBprimeTobHtWinc_M_1500_cfi import *
 #from BprimebHAnalysis.BprimeTobHAnalysis.BpBpToBHTWinc.BprimeBprimeTobHtWinc_M_800_cfi import *
 
 options = VarParsing('python')
@@ -105,7 +105,7 @@ options.setDefault('maxEvents', -50000)
 
 options.parseArguments()
 
-process = cms.Process("BprimebH")
+process = cms.Process("BprimebHDevelopment") #eleni
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cout = cms.untracked.PSet(
@@ -121,11 +121,22 @@ process.TFileService = cms.Service("TFileService",
     fileName = cms.string(options.outFilename) 
     )
 
-process.BprimebH = cms.EDAnalyzer('BprimeTobHAnalysis',
+process.BprimebHDevelopment = cms.EDAnalyzer('BprimeTobHDevelopment',
     MaxEvents           = cms.int32(options.maxEvents),
     ReportEvery         = cms.int32(options.reportEvery),  
     InputTTree          = cms.string('ntuple/tree'),
-    InputFiles          = cms.vstring(FileNames), 
+#eleni    InputFiles          = cms.vstring(FileNames), 
+    InputFiles          = cms.vstring("/tmp/petrakou/BprimeTobH_v1_1_1_ylE.root",
+"/tmp/petrakou/BprimeTobH_v1_2_1_UbX.root",
+"/tmp/petrakou/BprimeTobH_v1_3_1_3HI.root",
+"/tmp/petrakou/BprimeTobH_v1_4_1_fmJ.root",
+"/tmp/petrakou/BprimeTobH_v1_5_1_CSW.root",
+"/tmp/petrakou/BprimeTobH_v1_6_1_sy4.root",
+"/tmp/petrakou/BprimeTobH_v1_7_1_mlE.root",
+"/tmp/petrakou/BprimeTobH_v1_8_1_DhQ.root",
+"/tmp/petrakou/BprimeTobH_v1_9_1_n73.root",
+"/tmp/petrakou/BprimeTobH_v1_10_1_1SL.root"),
+#("/tmp/petrakou/BprimeTobH_v1_7_1_mlE.root"),
     JetPtMin            = cms.double(options.jetPtMin),
     JetPtMax            = cms.double(options.jetPtMax),
     JetAbsEtaMax        = cms.double(2.4),
@@ -146,5 +157,5 @@ process.BprimebH = cms.EDAnalyzer('BprimeTobHAnalysis',
     HTMax               = cms.double(options.hTMax), 
     ) 
 
-process.p = cms.Path(process.BprimebH)
+process.p = cms.Path(process.BprimebHDevelopment)
 
