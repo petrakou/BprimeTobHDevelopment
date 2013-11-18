@@ -135,7 +135,10 @@ class BprimeTobHDevelopment : public edm::EDAnalyzer {
     float evtwt_ ; 
     double puweight_ ;
 
+    bool doNminus1_ ;
+    bool doAnalysis_ ;
     bool TriggerStudyOn_ ;
+    bool doTree_ ;
 
     //// Histograms
 
@@ -148,6 +151,12 @@ class BprimeTobHDevelopment : public edm::EDAnalyzer {
     TGraphAsymmErrors* HT_Eff ;
     TGraphAsymmErrors* pt_HiggsJets_Eff ;
     TGraphAsymmErrors* pt_BJets_Eff ;
+
+    TGraphAsymmErrors* TriggerEff_HT ;
+    TGraphAsymmErrors* TriggerEff_AK5HT ;
+    TGraphAsymmErrors* TriggerEff_HiggsJetpT ;
+    TGraphAsymmErrors* TriggerEff_JetpT ;
+    TGraphAsymmErrors* TriggerEff_JetEta ;
 
     TH1D* h_nHiggsJets_NoCuts ;
     TH1D* h_nBJets_NoCuts ;
@@ -184,6 +193,18 @@ class BprimeTobHDevelopment : public edm::EDAnalyzer {
     TH1D* h_HT_NoHTCut ;
     TH1D* h_pt_HiggsJets_NoHTCut ;
     TH1D* h_pt_BJets_NoHTCut ;
+
+    //// For trigger efficiencies 
+    TH1D* h_TrigStudySel_before_HT ;
+    TH1D* h_TrigStudySel_before_AK5HT ;
+    TH1D* h_TrigStudySel_before_HiggsJet_pT ;
+    TH1D* h_TrigStudySel_before_bJet_pT ;
+    TH1D* h_TrigStudySel_before_bJet_Eta ;
+    TH1D* h_TrigStudySel_HT ;
+    TH1D* h_TrigStudySel_AK5HT ;
+    TH1D* h_TrigStudySel_HiggsJet_pT ;
+    TH1D* h_TrigStudySel_bJet_pT ;
+    TH1D* h_TrigStudySel_bJet_Eta ;
 
     //// The tree
     TTree *tree; // = new TTree("T","Branches for tmva use");
@@ -226,8 +247,12 @@ BprimeTobHDevelopment::BprimeTobHDevelopment(const edm::ParameterSet& iConfig) :
   isData_(0),
   evtwt_(1),
   puweight_(1),
-  TriggerStudyOn_(0), //eleni
-  jetPtPreselection_(30.)
+  jetPtPreselection_(30.),
+  doNminus1_(1),
+  doAnalysis_(1),
+  TriggerStudyOn_(1), // Note: For this to be meaningful, the doAnalysis_ has to be set as well.
+                      // NOTE: When this is ohset, then the trigger bin in cutflow won't get filled. 
+  doTree_(1)
 { 
 
    if (doPUReweighting_) LumiWeights_ = edm::LumiReWeighting(file_PUDistMC_, file_PUDistData_, hist_PUDistMC_, hist_PUDistData_) ;
@@ -308,6 +333,18 @@ void BprimeTobHDevelopment::beginJob() {
   h_pt_HiggsJets_NoHTCut        = fs->make<TH1D>("h_HiggsJet_Pt_NoHTCut"             ,"Higgs jet p_{T} [GeV]"      ,100 ,0.  ,2000.);
   h_pt_BJets_NoHTCut            = fs->make<TH1D>("h_BJet_Pt_NoHTCut"                 ,"b jet p_{T} [GeV]"          ,100 ,0.  ,2000.);
 
+  h_TrigStudySel_before_HT	= fs->make<TH1D>("h_TrigStudySel_before_HT"                     ,"H_{T}[GeV]"                 ,100 ,0.  ,4000.);
+  h_TrigStudySel_before_AK5HT      = fs->make<TH1D>("h_TrigStudySel_before_AK5HT"                     ,"H_{T}[GeV]"                 ,100 ,0.  ,4000.);
+  h_TrigStudySel_before_HiggsJet_pT = fs->make<TH1D>("h_TrigStudySel_before_HiggsJet_pT"        ,"Higgs jet p_{T} [GeV]"      ,50 ,0.  ,2000.);
+  h_TrigStudySel_before_bJet_pT = fs->make<TH1D>("h_TrigStudySel_before_bJet_pT"     ,"b jet p_{T} [GeV]"          ,50 ,0.  ,2000.);
+  h_TrigStudySel_before_bJet_Eta = fs->make<TH1D>("h_TrigStudySel_before_bJet_Eta"     ,"b jet #eta"          ,50 ,-2.5  ,2.5);
+  h_TrigStudySel_HT		= fs->make<TH1D>("h_TrigStudySel_HT"                 ,"H_{T}[GeV]"                 ,100 ,0.  ,4000.);
+  h_TrigStudySel_AK5HT             = fs->make<TH1D>("h_TrigStudySel_AK5HT"                 ,"H_{T}[GeV]"                 ,100 ,0.  ,4000.);
+  h_TrigStudySel_HiggsJet_pT	= fs->make<TH1D>("h_TrigStudySel_HiggsJet_pT"        ,"Higgs jet p_{T} [GeV]"      ,50 ,0.  ,2000.);
+  h_TrigStudySel_bJet_pT	= fs->make<TH1D>("h_TrigStudySel_bJet_pT"            ,"b jet p_{T} [GeV]"          ,50 ,0.  ,2000.);
+  h_TrigStudySel_bJet_Eta = fs->make<TH1D>("h_TrigStudySel_bJet_Eta"     ,"b jet #eta"          ,50 ,-2.5  ,2.5);
+
+
 //  h_HiggsPt                    = fs->make<TH1D>("h_HiggsPt"                   ,"Higgs p_{T} [GeV]"          ,100 ,0.  ,2000.);
 //  h_HiggsPtMatchedJet          = fs->make<TH1D>("h_HiggsPtMatchedJet"         ,"Matched Higgs p_{T} [GeV]"  ,100 ,0.  ,2000.);
   h_cutflow                    = fs->make<TH1D>("h_cutflow"                   ,"Cut flow"                   ,20  ,0.  ,20.  ); 
@@ -341,7 +378,10 @@ void BprimeTobHDevelopment::beginJob() {
   h_cutflow -> GetXaxis() -> SetBinLabel(8,"TriggerStudy") ;
 
   for (int ii = 1; ii <= 8; ++ii) 
-    CreateHistos(h_cutflow->GetXaxis()->GetBinLabel(ii)) ; 
+    CreateHistos(h_cutflow->GetXaxis()->GetBinLabel(ii)) ;
+
+  CreateHistos("TrigStudySel"); //eleni
+ 
 
   h_nHiggsJets_NoCuts -> Sumw2() ;
   h_nBJets_NoCuts -> Sumw2() ;
@@ -378,6 +418,17 @@ void BprimeTobHDevelopment::beginJob() {
   h_HT_NoHTCut -> Sumw2() ;
   h_pt_HiggsJets_NoHTCut -> Sumw2() ;
   h_pt_BJets_NoHTCut -> Sumw2() ;
+
+  h_TrigStudySel_before_HT -> Sumw2() ;
+  h_TrigStudySel_before_AK5HT -> Sumw2() ;
+  h_TrigStudySel_before_HiggsJet_pT -> Sumw2() ;
+  h_TrigStudySel_before_bJet_pT -> Sumw2() ;
+  h_TrigStudySel_before_bJet_Eta -> Sumw2() ;
+  h_TrigStudySel_HT -> Sumw2() ;
+  h_TrigStudySel_AK5HT -> Sumw2() ;
+  h_TrigStudySel_HiggsJet_pT -> Sumw2() ;
+  h_TrigStudySel_bJet_pT -> Sumw2() ;
+  h_TrigStudySel_bJet_Eta -> Sumw2() ;
 
   return ;  
 
@@ -458,7 +509,8 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
   pat::strbitset retca8 = fatjetIDLoose.getBitTemplate() ;
 
   edm::LogInfo("StartingAnalysisLoop") << "Starting analysis loop\n";
-/*
+
+  if ( doNminus1_ ) {
   for(int entry=0; entry<maxEvents_; entry++) {
 //  for(int entry=0; entry<1000; entry++) {
 
@@ -500,8 +552,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
       else passHLT = false ;
     }
     
-    if ( passHLT ) { }
-    else if (!TriggerStudyOn_) continue ;
+    if ( !passHLT ) continue;
 
     bool CA8pre(false);
     for (int ifj=0; ifj < FatJetInfo.Size; ++ifj) {
@@ -832,7 +883,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     for (int ijet = 0; ijet < JetInfo.Size; ++ijet) { 
 
       if ( JetInfo.Pt[ijet] < jetPtPreselection_ ) continue;
-      if ( JetInfo.Pt[ijet] < jetPtMin_ || JetInfo.Pt[ijet] > jetPtMax_ ) {}
+//      if ( JetInfo.Pt[ijet] < jetPtMin_ || JetInfo.Pt[ijet] > jetPtMax_ ) {}
       if ( fabs(JetInfo.Eta[ijet]) > jetAbsEtaMax_ ) continue ; 
       retak5.set(false);
       if ( jetIDTight(ijet,retak5) == 0 ) continue;
@@ -1286,12 +1337,17 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
   nHiggsJets_Eff->Write();
   nBJets_Eff->Write();
   HT_Eff->Write();
-*/
+
+ } // doNminus1_
+
 //==============================================================================================  
 
-  // Analysis loop 
-  // (should be in sync with the Analyzer module; riht now it lacks the PU reweighting part) 
 
+  // Analysis loop 
+  // (should be in sync with the Analyzer module)
+  // Also used for trigger studies 
+
+ if ( doAnalysis_ ) {
   for(int entry=0; entry<maxEvents_; entry++) {
 //  for(int entry=0; entry<1000; entry++) {
 
@@ -1342,9 +1398,16 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
       }
       else passHLT = false ; 
     }
- 
-    if ( passHLT ) h_cutflow -> Fill("TriggerSel", 1) ; 
-    else if (!TriggerStudyOn_) continue ; 
+
+    if (!TriggerStudyOn_) {
+      if ( passHLT ) {
+        FillHisto(TString("TriggerSel")+TString("_nPVtx_NoPUWt"), nGoodVtxs, evtwt_) ;
+        FillHisto(TString("TriggerSel")+TString("_nPVtx_PUWt"), nGoodVtxs, evtwt_*puweight_) ;
+        FillHisto(TString("TriggerSel")+TString("_nJets"), JetInfo.Size, evtwt_*puweight_) ;
+        FillHisto(TString("TriggerSel")+TString("_nFatJets"), FatJetInfo.Size, evtwt_*puweight_) ;
+        h_cutflow -> Fill("TriggerSel", 1) ; 
+      } else continue ; 
+    }   
 
     bool CA8pre(false);
     for (int ifj=0; ifj < FatJetInfo.Size; ++ifj) {
@@ -1361,11 +1424,6 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     }
     if( AK5preCount < 2 ) continue;
 
-    FillHisto(TString("TriggerSel")+TString("_nPVtx_NoPUWt"), nGoodVtxs, evtwt_) ; 
-    FillHisto(TString("TriggerSel")+TString("_nPVtx_PUWt"), nGoodVtxs, evtwt_*puweight_) ; 
-    FillHisto(TString("TriggerSel")+TString("_nJets"), JetInfo.Size, evtwt_*puweight_) ; 
-    FillHisto(TString("TriggerSel")+TString("_nFatJets"), FatJetInfo.Size, evtwt_*puweight_) ;
- 
     evtwt_ *= puweight_ ; 
 
     TLorentzVector higgs_p4 ; 
@@ -1373,16 +1431,11 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
 
       if ( GenInfo.Status[igen] == 3 
           && TMath::Abs(GenInfo.PdgID[igen])==25 
-          //&& GenInfo.nDa[igen] == 2 
-          //&& TMath::Abs(GenInfo.PdgID[GenInfo.Da1[igen]])==5 
-          //&& TMath::Abs(GenInfo.PdgID[GenInfo.Da2[igen]])==5 
          ) { 
 
         higgs_p4.SetPtEtaPhiM(GenInfo.Pt[igen], GenInfo.Eta[igen], GenInfo.Phi[igen], GenInfo.Mass[igen]) ; 
         TLorentzVector fatjet_p4;
         bool matched ; 
-
-//        h_HiggsPt ->Fill(higgs_p4.Pt()) ; 
 
         for (int ifatjet=0; ifatjet < FatJetInfo.Size; ++ifatjet) { 
 
@@ -1394,7 +1447,6 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
 
           if (higgs_p4.DeltaR(fatjet_p4) < 0.5) {
             matched = true ; 
-//            h_HiggsPtMatchedJet ->Fill(higgs_p4.Pt()) ; 
             break ; 
           }
           else 
@@ -1402,16 +1454,12 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
 
         } //// Loop over fat jets 
 
-//        teff_HiggsJetMatch -> Fill(matched, GenInfo.Pt[igen]) ; 
-
       } //// Get Higgs boson 
 
     } //// Loop over all gen particles 
 
 
     for (int ifatjet=0; ifatjet < FatJetInfo.Size; ++ifatjet) {
-
-      //Fix h_FatJets_Pt->Fill(FatJetInfo.Pt[ifatjet]);
 
       //// Fat jet selection
       if ( FatJetInfo.Pt[ifatjet] < fatJetPtMin_ || FatJetInfo.Pt[ifatjet] > fatJetPtMax_ ) 
@@ -1428,16 +1476,6 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
       fatjet_p4.SetPtEtaPhiM(FatJetInfo.Pt[ifatjet], FatJetInfo.Eta[ifatjet], 
           FatJetInfo.Phi[ifatjet], FatJetInfo.Mass[ifatjet]);
 
-/*eleni
-       h_FatJets_Pt->Fill(fatjet_p4.Pt()) ;  
-       h_FatJets_Eta->Fill(fatjet_p4.Eta()) ; 
-       h_FatJets_Mass->Fill(fatjet_p4.Mag()) ; 
-       h_FatJets_MassPruned->Fill(FatJetInfo.MassPruned[ifatjet]) ; 
-       h_FatJets_CombinedSVBJetTags->Fill(FatJetInfo.CombinedSVBJetTags[ifatjet]) ; 
-       h_FatJets_tau2ByTau1->Fill(FatJetInfo.tau2[ifatjet]/FatJetInfo.tau1[ifatjet]) ;
-       h_FatJets_tau3ByTau2->Fill(FatJetInfo.tau3[ifatjet]/FatJetInfo.tau2[ifatjet]) ;
-       h_FatJets_tau3ByTau1->Fill(FatJetInfo.tau3[ifatjet]/FatJetInfo.tau1[ifatjet]) ;
-*/
        FillHisto(TString("TriggerSel")+TString("_FatJets_Pt")                 ,fatjet_p4.Pt() ,evtwt_)  ;
        FillHisto(TString("TriggerSel")+TString("_FatJets_Eta")                ,fatjet_p4.Eta() ,evtwt_)  ;
        FillHisto(TString("TriggerSel")+TString("_FatJets_Mass")               ,fatjet_p4.Mag() ,evtwt_)  ;
@@ -1470,17 +1508,6 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
       if( subjet_dyphi < (FatJetInfo.Mass[ifatjet]/FatJetInfo.Pt[ifatjet]) ) 
         continue; //// skip infrared unsafe configurations
 
-/*eleni
-       h_SubJet1_Pt->Fill(subjet1_p4.Pt()) ;  
-       h_SubJet1_Eta->Fill(subjet1_p4.Eta()) ; 
-       h_SubJet1_Mass->Fill(subjet1_p4.Mag()) ; 
-       h_SubJet1_CombinedSVBJetTags->Fill(SubJetInfo.CombinedSVBJetTags[iSubJet1]) ; 
- 
-       h_SubJet2_Pt->Fill(subjet2_p4.Pt()) ;  
-       h_SubJet2_Eta->Fill(subjet2_p4.Eta()) ; 
-       h_SubJet2_Mass->Fill(subjet2_p4.Mag()) ; 
-       h_SubJet2_CombinedSVBJetTags->Fill(SubJetInfo.CombinedSVBJetTags[iSubJet2]) ; 
-*/
        FillHisto(TString("TriggerSel")+TString("_SubJet1_Pt") ,subjet1_p4.Pt() ,evtwt_)  ;
        FillHisto(TString("TriggerSel")+TString("_SubJet1_Eta") ,subjet1_p4.Eta() ,evtwt_)  ;
        FillHisto(TString("TriggerSel")+TString("_SubJet1_Mass") ,subjet1_p4.Mag() ,evtwt_)  ;
@@ -1504,16 +1531,11 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
           && SubJetInfo.CombinedSVBJetTags[iSubJet1] < subjet1CSVDiscMax_ 
           && SubJetInfo.CombinedSVBJetTags[iSubJet2] > subjet2CSVDiscMin_ 
           && SubJetInfo.CombinedSVBJetTags[iSubJet2] < subjet2CSVDiscMax_) { 
-/*eleni
-         h_HiggsJet_Pt   -> Fill(fatjet_p4.Pt()) ; 
-         h_HiggsJet_Eta  -> Fill(fatjet_p4.Eta()) ;
-         h_HiggsJet_Mass -> Fill(fatjet_p4.Mag()) ;
-*/
            FillHisto(TString("TriggerSel")+TString("_HiggsJet_Pt")   ,fatjet_p4.Pt() ,evtwt_)  ;
            FillHisto(TString("TriggerSel")+TString("_HiggsJet_Eta")  ,fatjet_p4.Eta() ,evtwt_)  ;
            FillHisto(TString("TriggerSel")+TString("_HiggsJet_Mass") ,fatjet_p4.Mag() ,evtwt_)  ;
 
- 	 higgsJets.push_back(fatjet_p4) ;
+ 	   higgsJets.push_back(fatjet_p4) ;
 
         } //// Higgs tagging
 
@@ -1522,6 +1544,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     } //// Loop over fat jets 
 
 
+    float AK5HT(0.);
     for (int ijet = 0; ijet < JetInfo.Size; ++ijet) { 
 
       if ( JetInfo.Pt[ijet] < jetPtMin_ || JetInfo.Pt[ijet] > jetPtMax_ ) continue ; 
@@ -1535,6 +1558,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
       TLorentzVector jet_p4;
       jet_p4.SetPtEtaPhiM(JetInfo.Pt[ijet], JetInfo.Eta[ijet], 
           JetInfo.Phi[ijet], JetInfo.Mass[ijet]);
+      AK5HT += JetInfo.Pt[ijet];
 
       bool isJetNotHiggs(false) ; 
       for (std::vector<TLorentzVector>::const_iterator ihig = higgsJets.begin(); ihig != higgsJets.end(); ++ihig) {
@@ -1587,26 +1611,300 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
         h_cutflow -> Fill("BJetsSel", 1) ;
         FillHisto(TString("BJetsSel")+TString("_nJets"), JetInfo.Size, evtwt_) ; 
 
+	float maxHiggspT(0.), maxbpT(0.), maxbEta(0.);
         for (std::vector<TLorentzVector>::const_iterator ihig = higgsJets.begin(); ihig != higgsJets.end(); ++ihig) { 
           HT += ihig->Pt() ; 
+	  if ( ihig->Pt() > maxHiggspT ) maxHiggspT = ihig->Pt();
         }
         for (std::vector<TLorentzVector>::const_iterator ib = bJets.begin(); ib != bJets.end(); ++ib) { 
           HT += ib->Pt() ; 
+	  if ( ib->Pt() > maxbpT ) {
+	    maxbpT = ib->Pt();
+	    maxbEta = ib->Eta();
+	  }
         }
 
-//eleni ATTENTION        if (HT < HTMin_ || HT > HTMax_) continue ; 
+        if (HT < HTMin_ || HT > HTMax_) continue ;
 
-/*eleni
-        h_cutflow -> Fill("HTSel", 1) ; 
-        FillHisto(TString("HTSel")+TString("_nJets"), njets, 1) ; 
-        FillHisto(TString("HTSel")+TString("_nBJets"), bJets.size(), 1) ; 
-        FillHisto(TString("HTSel")+TString("_nHJets"), higgsJets.size(), 1) ; 
-*/
         FillHisto(TString("HTSel")+TString("_nJets"), njets, evtwt_) ;
         FillHisto(TString("HTSel")+TString("_nBJets"), bJets.size(), evtwt_) ;
         FillHisto(TString("HTSel")+TString("_nHJets"), higgsJets.size(), evtwt_) ;
         FillHisto(TString("HTSel")+TString("_HT") ,HT ,evtwt_)  ;
         if ( !isData_ ) h_cutflow -> Fill("HTSel", 1) ;
+
+	//// Trigger studies 
+	h_TrigStudySel_before_HT -> Fill(HT ,evtwt_)  ;
+        h_TrigStudySel_before_AK5HT -> Fill(AK5HT ,evtwt_)  ;
+        h_TrigStudySel_before_HiggsJet_pT -> Fill(maxHiggspT ,evtwt_)  ;
+	h_TrigStudySel_before_bJet_pT -> Fill(maxbpT ,evtwt_)  ;
+        h_TrigStudySel_before_bJet_Eta -> Fill(maxbEta ,evtwt_)  ;
+
+	bool passHLT_(false);
+	if ( TriggerStudyOn_ ) {
+	  for ( std::vector<int>::const_iterator ihlt = hltPaths_.begin(); ihlt != hltPaths_.end(); ++ihlt ) {
+	    if (EvtInfo.TrgBook[*ihlt] == 1) {
+              passHLT_ = true ;
+      	      break ;
+	    }
+	  }
+	}
+	if ( passHLT_ ) {
+	  h_cutflow -> Fill("TriggerStudy", 1) ;
+	  h_TrigStudySel_HT -> Fill(HT ,evtwt_)  ;
+	  h_TrigStudySel_AK5HT -> Fill(AK5HT ,evtwt_)  ;
+	  h_TrigStudySel_HiggsJet_pT -> Fill(maxHiggspT ,evtwt_)  ;
+	  h_TrigStudySel_bJet_pT -> Fill(maxbpT ,evtwt_)  ;
+	  h_TrigStudySel_bJet_Eta -> Fill(maxbEta ,evtwt_)  ;
+	}
+
+
+        //// Reconstruct b' candidates
+
+        for (std::vector<TLorentzVector>::const_iterator ihig = higgsJets.begin(); ihig != higgsJets.end(); ++ihig) { 
+          const TLorentzVector* closestB_p4 ;
+          double deltaR(TMath::Pi()) ; 
+          for (std::vector<TLorentzVector>::const_iterator ib = bJets.begin(); ib != bJets.end(); ++ib) { 
+            if ( ihig->DeltaR(*ib) < deltaR) {
+              deltaR = ihig->DeltaR(*ib) ; 
+              closestB_p4 = &(*ib) ; 
+            }
+          }
+          if (deltaR < TMath::Pi()) {
+            bprimes.push_back(*ihig + *closestB_p4) ; 
+
+            FillHisto(TString("HTSel")+TString("_bprimePt") ,(*ihig + *closestB_p4).Pt() ,evtwt_)  ;
+            FillHisto(TString("HTSel")+TString("_bprimeMass") ,(*ihig + *closestB_p4).Mag() ,evtwt_)  ;
+
+          }
+
+        } //// Reconstruct b' candidates
+
+      } //// If at least two b-jets 
+    } //// If at least one Higgs jet 
+
+  } //// entry loop 
+
+  cout << endl << "h_TrigStudySel_before_HT: " << h_TrigStudySel_before_HT->GetEntries() << " entries, h_TrigStudySel_HT: " << h_TrigStudySel_HT->GetEntries() << endl;
+
+  TriggerEff_HT = new TGraphAsymmErrors(h_TrigStudySel_HT, h_TrigStudySel_before_HT, "cl=0.683 b(1,1) mode") ;
+  TriggerEff_HT->SetName("TriggerEff_HT") ;
+  TriggerEff_HT->Write() ;
+
+  TriggerEff_AK5HT = new TGraphAsymmErrors(h_TrigStudySel_AK5HT, h_TrigStudySel_before_AK5HT, "cl=0.683 b(1,1) mode") ;
+  TriggerEff_AK5HT->SetName("TriggerEff_AK5HT") ;
+  TriggerEff_AK5HT->Write() ;
+
+  TriggerEff_HiggsJetpT = new TGraphAsymmErrors(h_TrigStudySel_HiggsJet_pT, h_TrigStudySel_before_HiggsJet_pT, "cl=0.683 b(1,1) mode") ;
+  TriggerEff_HiggsJetpT->SetName("TriggerEff_HiggHiggssJetpT") ;
+  TriggerEff_HiggsJetpT->Write() ; 
+
+  TriggerEff_JetpT = new TGraphAsymmErrors(h_TrigStudySel_bJet_pT, h_TrigStudySel_before_bJet_pT, "cl=0.683 b(1,1) mode") ;
+  TriggerEff_JetpT->SetName("TriggerEff_JetpT") ;
+  TriggerEff_JetpT->Write() ;
+
+  TriggerEff_JetEta = new TGraphAsymmErrors(h_TrigStudySel_bJet_Eta, h_TrigStudySel_before_bJet_Eta, "cl=0.683 b(1,1) mode") ;
+  TriggerEff_JetEta->SetName("TriggerEff_JetEta") ;
+  TriggerEff_JetEta->Write() ;
+
+ } // doAnalysis_
+
+//==============================================================================================  
+
+
+  // Analysis loop for filling the mini tree 
+  // Should be in sync with the Analysis module, 
+  // but with the changes needed for having looser samples. 
+
+ if ( doTree_ ) {
+  for(int entry=0; entry<maxEvents_; entry++) {
+//  for(int entry=0; entry<1000; entry++) {
+
+    //// Event variables 
+    std::vector<TLorentzVector>fatJets ;
+    std::vector<TLorentzVector>higgsJets ; 
+    std::vector<TLorentzVector>jets ; 
+    std::vector<TLorentzVector>bJets ; 
+    //std::vector<std::pair<int,TLorentzVector> > higgsJets ; 
+    //std::vector<std::pair<int,TLorentzVector> > jets ; 
+    //std::vector<std::pair<int,TLorentzVector> > bJets ; 
+    std::vector<TLorentzVector>bprimes ; 
+
+    int njets(0) ; 
+    bool passHLT(false) ;
+    double HT(0) ; 
+    int  nGoodVtxs(0) ;
+
+    if((entry%reportEvery_) == 0) edm::LogInfo("Event") << entry << " of " << maxEvents_ ; 
+
+    chain_->GetEntry(entry);
+
+    isData_ = EvtInfo.McFlag ? 0 : 1;
+    if ( !isData_ ) evtwt_  = EvtInfo.Weight ;
+    if ( doPUReweighting_ && !isData_ ) puweight_ = LumiWeights_.weight(EvtInfo.TrueIT[0]) ; 
+
+    nGoodVtxs = 0 ;
+    //// Select good vertices 
+    for (int iVtx=0; iVtx < VtxInfo.Size; ++iVtx) {
+      if (   VtxInfo.Type[iVtx]==1
+          && VtxInfo.isFake[iVtx]==false
+          && VtxInfo.Ndof[iVtx]>4
+          && VtxInfo.Rho[iVtx]<2.
+          && VtxInfo.z[iVtx]<24.) { ++nGoodVtxs ; }
+    }
+    if (nGoodVtxs < 1)  { edm::LogInfo("NoGoodPrimaryVertex") << " No good primary vertex " ; continue ; }
+
+    for ( std::vector<int>::const_iterator ihlt = hltPaths_.begin(); ihlt != hltPaths_.end(); ++ihlt ) { 
+      if (EvtInfo.TrgBook[*ihlt] == 1) { 
+         passHLT = true ; 
+         break ; 
+      }
+      else passHLT = false ; 
+    }
+ 
+    if ( !passHLT ) continue ; 
+
+    bool CA8pre(false);
+    for (int ifj=0; ifj < FatJetInfo.Size; ++ifj) {
+      if ( FatJetInfo.Pt[ifj] > 100. ) {
+        CA8pre = true;
+        break;
+      }
+    }
+    if( !CA8pre ) continue;
+
+    int AK5preCount(0);
+    for (int ij=0; ij < JetInfo.Size; ++ij) {
+      if ( JetInfo.Pt[ij] > 30. ) AK5preCount++;
+    }
+    if( AK5preCount < 2 ) continue;
+
+    evtwt_ *= puweight_ ; 
+
+
+    for (int ifatjet=0; ifatjet < FatJetInfo.Size; ++ifatjet) {
+
+      //// Fat jet selection
+      if ( FatJetInfo.Pt[ifatjet] < fatJetPtMin_ || FatJetInfo.Pt[ifatjet] > fatJetPtMax_ ) 
+        continue; //// apply jet pT cut
+      if ( fabs(FatJetInfo.Eta[ifatjet]) > fatJetAbsEtaMax_ ) 
+        continue; //// apply jet eta cut
+      if ( FatJetInfo.MassPruned[ifatjet] < fatJetPrunedMassMin_ 
+          || FatJetInfo.MassPruned[ifatjet] > fatJetPrunedMassMax_ ) 
+        continue; //// apply pruned jet mass cut 
+      retca8.set(false);
+      if ( fatjetIDLoose(ifatjet,retca8) == 0 ) continue; //// apply loose jet ID
+
+      TLorentzVector fatjet_p4;
+      fatjet_p4.SetPtEtaPhiM(FatJetInfo.Pt[ifatjet], FatJetInfo.Eta[ifatjet], 
+          FatJetInfo.Phi[ifatjet], FatJetInfo.Mass[ifatjet]);
+
+
+      //// Get subjets of fat jets 
+
+      int iSubJet1 = FatJetInfo.Jet_SubJet1Idx[ifatjet];
+      int iSubJet2 = FatJetInfo.Jet_SubJet2Idx[ifatjet];
+
+      if( SubJetInfo.Pt[iSubJet1]==0. || SubJetInfo.Pt[iSubJet2]==0. ) 
+        continue; //// skip fat jets for which one of the subjets has pT=0
+
+      TLorentzVector subjet1_p4, subjet2_p4;
+      subjet1_p4.SetPtEtaPhiM(SubJetInfo.Pt[iSubJet1], SubJetInfo.Eta[iSubJet1], 
+          SubJetInfo.Phi[iSubJet1], SubJetInfo.Mass[iSubJet1]);
+      subjet2_p4.SetPtEtaPhiM(SubJetInfo.Pt[iSubJet2], SubJetInfo.Eta[iSubJet2], 
+          SubJetInfo.Phi[iSubJet2], SubJetInfo.Mass[iSubJet2]);
+
+      double subjet_dR = subjet1_p4.DeltaR(subjet2_p4);
+      double subjet_dy = subjet1_p4.Rapidity() - subjet2_p4.Rapidity() ;
+      double subjet_dphi = subjet1_p4.DeltaPhi(subjet2_p4); ;
+      double subjet_dyphi = sqrt( subjet_dy*subjet_dy + subjet_dphi*subjet_dphi ) ;
+
+      if( subjet_dyphi < (FatJetInfo.Mass[ifatjet]/FatJetInfo.Pt[ifatjet]) ) 
+        continue; //// skip infrared unsafe configurations
+
+
+       //// Selecting fat jets
+      if (fatjet_p4.Mag() > fatJetMassMin_ 
+          && fatjet_p4.Mag() < fatJetMassMax_ 
+          && FatJetInfo.tau2[ifatjet]/FatJetInfo.tau1[ifatjet] < fatJetTau2ByTau1Max_) {
+
+	  fatJets.push_back(fatjet_p4) ;
+
+         //// Higgs tagging
+         if ( SubJetInfo.CombinedSVBJetTags[iSubJet1] > subjet1CSVDiscMin_ 
+          && SubJetInfo.CombinedSVBJetTags[iSubJet1] < subjet1CSVDiscMax_ 
+          && SubJetInfo.CombinedSVBJetTags[iSubJet2] > subjet2CSVDiscMin_ 
+          && SubJetInfo.CombinedSVBJetTags[iSubJet2] < subjet2CSVDiscMax_) { 
+
+ 	   higgsJets.push_back(fatjet_p4) ;
+
+        } //// Higgs tagging
+
+      } //// Selecting fat jets
+
+    } //// Loop over fat jets 
+
+
+    float AK5HT(0.);
+    for (int ijet = 0; ijet < JetInfo.Size; ++ijet) { 
+
+      if ( JetInfo.Pt[ijet] < jetPtMin_ || JetInfo.Pt[ijet] > jetPtMax_ ) continue ; 
+      if ( fabs(JetInfo.Eta[ijet]) > jetAbsEtaMax_ ) continue ; 
+      retak5.set(false);
+      if ( jetIDTight(ijet,retak5) == 0 ) continue;
+
+      ++njets ; 
+
+      TLorentzVector jet_p4;
+      jet_p4.SetPtEtaPhiM(JetInfo.Pt[ijet], JetInfo.Eta[ijet], 
+          JetInfo.Phi[ijet], JetInfo.Mass[ijet]);
+      AK5HT += JetInfo.Pt[ijet];
+
+      bool isJetNotHiggs(false) ; 
+      for (std::vector<TLorentzVector>::const_iterator ihig = higgsJets.begin(); ihig != higgsJets.end(); ++ihig) {
+        if (jet_p4.DeltaR(*ihig) < 1.2) {
+          isJetNotHiggs = false ; 
+          break ; 
+        }
+        else {
+          isJetNotHiggs = true ; 
+        } 
+      } 
+      if (!isJetNotHiggs) continue ; //// Higgs-b jet disambiguation  
+
+      jets.push_back(jet_p4) ; 
+
+      if (JetInfo.Pt[ijet] > bjetPtMin_ && JetInfo.CombinedSVBJetTags[ijet] > 0.244 ) { //&& JetInfo.CombinedSVBJetTags[ijet] > 0.679) { //eleni
+
+        TLorentzVector bjet_p4;
+        bjet_p4.SetPtEtaPhiM(JetInfo.Pt[ijet], JetInfo.Eta[ijet], 
+            JetInfo.Phi[ijet], JetInfo.Mass[ijet]);
+
+	bJets.push_back(bjet_p4) ;
+
+      } //// Select b-tagged AK5 jets 
+
+    } //// Loop over AK5 jets 
+
+
+    if (higgsJets.size() >= 1) {
+
+      if (bJets.size() >= 2 ) { 
+
+	float maxHiggspT(0.), maxbpT(0.), maxbEta(0.);
+        for (std::vector<TLorentzVector>::const_iterator ihig = higgsJets.begin(); ihig != higgsJets.end(); ++ihig) { 
+          HT += ihig->Pt() ; 
+	  if ( ihig->Pt() > maxHiggspT ) maxHiggspT = ihig->Pt();
+        }
+        for (std::vector<TLorentzVector>::const_iterator ib = bJets.begin(); ib != bJets.end(); ++ib) { 
+          HT += ib->Pt() ; 
+	  if ( ib->Pt() > maxbpT ) {
+	    maxbpT = ib->Pt();
+	    maxbEta = ib->Eta();
+	  }
+        }
+
+        //eleni if (HT < HTMin_ || HT > HTMax_) continue ; 
+
 
         //// Reconstruct b' candidates
 
@@ -1632,9 +1930,6 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
               BEta = closestB_p4->Eta();
             }
 
-             FillHisto(TString("HTSel")+TString("_bprimePt") ,(*ihig + *closestB_p4).Pt() ,evtwt_)  ;
-             FillHisto(TString("HTSel")+TString("_bprimeMass") ,(*ihig + *closestB_p4).Mag() ,evtwt_)  ;
-
           }
 
         } //// Reconstruct b' candidates
@@ -1658,9 +1953,8 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
 
   } //// entry loop 
 
-//*/
-//==============================================================================================  
-  
+ } // doTree_
+
 }
 
 
