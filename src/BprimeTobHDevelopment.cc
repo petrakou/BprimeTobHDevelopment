@@ -207,8 +207,10 @@ class BprimeTobHDevelopment : public edm::EDAnalyzer {
     TH1D* h_TrigStudySel_bJet_Eta ;
 
     //// The tree
-    TTree *tree; // = new TTree("T","Branches for tmva use");
+    TTree *tree;
     float final_nHiggsJets, final_nBJets, final_HiggsJets_pt, final_BJets_pt, final_HT, final_evtwt, final_HiggsJets_eta, final_BJets_eta;
+    float final_AK5HT, final_HiggsJets_phi, final_BJets_phi, final_Bprime_mass, final_DR_bHiggs;
+    float final_HJet_Mass, final_HJet_PrunedMass, final_HJet_Nsubjetiness, final_Subjet_MaxPt, final_Subjet_MinPt, final_Subjet_CSV_MaxPt, final_Subjet_CSV_MinPt, final_Subjet_MaxCSV, final_Subjet_MinCSV, final_Subjet_DR, final_bJet_CSV;
 
 };
 
@@ -256,17 +258,6 @@ BprimeTobHDevelopment::BprimeTobHDevelopment(const edm::ParameterSet& iConfig) :
 { 
 
    if (doPUReweighting_) LumiWeights_ = edm::LumiReWeighting(file_PUDistMC_, file_PUDistData_, hist_PUDistMC_, hist_PUDistData_) ;
-   tree = new TTree("T","Branches for TMVA use");
-   tree->Branch("final_nHiggsJets", &final_nHiggsJets, "final_nHiggsJets/F");
-   tree->Branch("final_nBJets", &final_nBJets, "final_nBJets/F");
-   tree->Branch("final_HiggsJets_pt", &final_HiggsJets_pt, "final_HiggsJets_pt/F");
-   tree->Branch("final_BJets_pt", &final_BJets_pt, "final_BJets_pt/F");
-   tree->Branch("final_HT", &final_HT, "final_HT/F");
-   tree->Branch("final_evtwt", &final_evtwt, "final_evtwt/F");
-   tree->Branch("final_HiggsJets_eta", &final_HiggsJets_eta, "final_HiggsJets_eta/F");
-   tree->Branch("final_BJets_eta", &final_BJets_eta, "final_BJets_eta/F");
-   //tree->Branch("", &, "/F");
-
 }
 
 
@@ -430,6 +421,39 @@ void BprimeTobHDevelopment::beginJob() {
   h_TrigStudySel_bJet_pT -> Sumw2() ;
   h_TrigStudySel_bJet_Eta -> Sumw2() ;
 
+   tree = new TTree("T","Branches for TMVA use");
+
+   // Event kinematics
+   tree->Branch("final_evtwt", &final_evtwt, "final_evtwt/F");
+   tree->Branch("final_nHiggsJets", &final_nHiggsJets, "final_nHiggsJets/F");
+   tree->Branch("final_nBJets", &final_nBJets, "final_nBJets/F");
+   tree->Branch("final_HT", &final_HT, "final_HT/F");
+   tree->Branch("final_AK5HT", &final_AK5HT, "final_AK5HT/F");
+   tree->Branch("final_HiggsJets_pt", &final_HiggsJets_pt, "final_HiggsJets_pt/F");
+   tree->Branch("final_HiggsJets_eta", &final_HiggsJets_eta, "final_HiggsJets_eta/F");
+   tree->Branch("final_HiggsJets_phi", &final_HiggsJets_phi, "final_HiggsJets_phi/F");
+   tree->Branch("final_BJets_pt", &final_BJets_pt, "final_BJets_pt/F");
+   tree->Branch("final_BJets_eta", &final_BJets_eta, "final_BJets_eta/F");
+   tree->Branch("final_BJets_phi", &final_BJets_phi, "final_BJets_phi/F");
+   tree->Branch("final_DR_bHiggs", &final_DR_bHiggs, "final_DR_bHiggs/F");
+   tree->Branch("final_Bprime_mass", &final_Bprime_mass, "final_Bprime_mass/F");
+
+   // Subjets, b-taggings and the like
+   tree->Branch("final_HJet_Mass", &final_HJet_Mass, "final_HJet_Mass/F");
+   tree->Branch("final_HJet_PrunedMass", &final_HJet_PrunedMass, "final_HJet_PrunedMass/F");
+   tree->Branch("final_HJet_Nsubjetiness", &final_HJet_Nsubjetiness, "final_HJet_Nsubjetiness/F");
+   tree->Branch("final_Subjet_MaxPt", &final_Subjet_MaxPt, "final_Subjet_MaxPt/F");
+   tree->Branch("final_Subjet_MinPt", &final_Subjet_MinPt, "final_Subjet_MinPt/F");
+   tree->Branch("final_Subjet_CSV_MaxPt", &final_Subjet_CSV_MaxPt, "final_Subjet_CSV_MaxPt/F");
+   tree->Branch("final_Subjet_CSV_MinPt", &final_Subjet_CSV_MinPt, "final_Subjet_CSV_MinPt/F");
+   tree->Branch("final_Subjet_MaxCSV", &final_Subjet_MaxCSV, "final_Subjet_MaxCSV/F");
+   tree->Branch("final_Subjet_MinCSV", &final_Subjet_MinCSV, "final_Subjet_MinCSV/F");
+   tree->Branch("final_Subjet_DR", &final_Subjet_DR, "final_Subjet_DR/F");
+   tree->Branch("final_bJet_CSV", &final_bJet_CSV, "final_bJet_CSV/F");
+
+   // Event shape and other advanced coolness
+   //tree->Branch("", &, "/F");
+
   return ;  
 
 }
@@ -523,7 +547,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     int njets(0) ; 
     int  nGoodVtxs(0) ;
 
-    if((entry%reportEvery_) == 0) edm::LogInfo("Event") << entry << " of " << maxEvents_ ; 
+    if((entry%reportEvery_) == 0) edm::LogInfo("Event") << "A- " << entry << " of " << maxEvents_ ; 
 
     chain_->GetEntry(entry);
 
@@ -1340,6 +1364,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
 
  } // doNminus1_
 
+
 //==============================================================================================  
 
 
@@ -1366,7 +1391,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     double HT(0) ; 
     int  nGoodVtxs(0) ;
 
-    if((entry%reportEvery_) == 0) edm::LogInfo("Event") << entry << " of " << maxEvents_ ; 
+    if((entry%reportEvery_) == 0) edm::LogInfo("Event") << "B- "  << entry << " of " << maxEvents_ ; 
 
     chain_->GetEntry(entry);
 
@@ -1708,6 +1733,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
 
  } // doAnalysis_
 
+
 //==============================================================================================  
 
 
@@ -1722,8 +1748,10 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     //// Event variables 
     std::vector<TLorentzVector>fatJets ;
     std::vector<TLorentzVector>higgsJets ; 
+    std::vector<int>higgsJetsIndex ;
     std::vector<TLorentzVector>jets ; 
     std::vector<TLorentzVector>bJets ; 
+    std::vector<int>bJetsIndex ;
     //std::vector<std::pair<int,TLorentzVector> > higgsJets ; 
     //std::vector<std::pair<int,TLorentzVector> > jets ; 
     //std::vector<std::pair<int,TLorentzVector> > bJets ; 
@@ -1734,7 +1762,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     double HT(0) ; 
     int  nGoodVtxs(0) ;
 
-    if((entry%reportEvery_) == 0) edm::LogInfo("Event") << entry << " of " << maxEvents_ ; 
+    if((entry%reportEvery_) == 0) edm::LogInfo("Event") << "C- "  << entry << " of " << maxEvents_ ; 
 
     chain_->GetEntry(entry);
 
@@ -1833,9 +1861,10 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
          if ( SubJetInfo.CombinedSVBJetTags[iSubJet1] > subjet1CSVDiscMin_ 
           && SubJetInfo.CombinedSVBJetTags[iSubJet1] < subjet1CSVDiscMax_ 
           && SubJetInfo.CombinedSVBJetTags[iSubJet2] > subjet2CSVDiscMin_ 
-          && SubJetInfo.CombinedSVBJetTags[iSubJet2] < subjet2CSVDiscMax_) { 
+          && SubJetInfo.CombinedSVBJetTags[iSubJet2] < subjet2CSVDiscMax_) {
 
  	   higgsJets.push_back(fatjet_p4) ;
+	   higgsJetsIndex.push_back(ifatjet) ;
 
         } //// Higgs tagging
 
@@ -1880,6 +1909,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
             JetInfo.Phi[ijet], JetInfo.Mass[ijet]);
 
 	bJets.push_back(bjet_p4) ;
+	bJetsIndex.push_back(ijet) ;
 
       } //// Select b-tagged AK5 jets 
 
@@ -1908,8 +1938,12 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
 
         //// Reconstruct b' candidates
 
-        float maxHig(0.), Bpt(0.);
-        float maxHigEta(0.), BEta(0.);
+        float maxHig(0.), Bpt(0.), maxHigBmass(0.), DR_bHiggs(0.);
+        float maxHigEta(0.), maxHigPhi(0.), BEta(0.), BPhi(0.);
+	float HJet_Mass(0.), HJet_PrunedMass(0.), HJet_Nsubjetiness(0.), bJet_CSV(0.);
+	float Subjet_MaxPt(0.), Subjet_MinPt(0.), Subjet_MaxCSV(0.), Subjet_MinCSV(0.), Subjet_CSV_MaxPt(0.), Subjet_CSV_MinPt(0.), Subjet_DR(0.);
+	int ihigi(0);
+        int ibi(0);
         for (std::vector<TLorentzVector>::const_iterator ihig = higgsJets.begin(); ihig != higgsJets.end(); ++ihig) { 
           const TLorentzVector* closestB_p4 ;
           double deltaR(TMath::Pi()) ; 
@@ -1922,27 +1956,70 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
           if (deltaR < TMath::Pi()) {
             bprimes.push_back(*ihig + *closestB_p4) ; 
 
-            // For tree filling
+            // For tree filling ---- 
             if ( ihig->Pt() > maxHig ) {
+
               maxHig = ihig->Pt();
               maxHigEta = ihig->Eta();
+              maxHigPhi = ihig->Phi();
               Bpt = closestB_p4->Pt();
               BEta = closestB_p4->Eta();
-            }
+              BPhi = closestB_p4->Phi();
+	      DR_bHiggs = deltaR;
+	      maxHigBmass = (*ihig + *closestB_p4).M();
+
+	      int ihigindex = higgsJetsIndex[ihigi];
+	      HJet_Mass = FatJetInfo.Mass[ihigindex];
+	      HJet_PrunedMass = FatJetInfo.MassPruned[ihigindex];
+	      HJet_Nsubjetiness = FatJetInfo.tau2[ihigindex]/FatJetInfo.tau1[ihigindex];
+	      int iSubJet1 = FatJetInfo.Jet_SubJet1Idx[ihigindex];
+              int iSubJet2 = FatJetInfo.Jet_SubJet2Idx[ihigindex];
+	      int pt1 = SubJetInfo.Pt[iSubJet1];
+              int pt2 = SubJetInfo.Pt[iSubJet2];
+              float csv1 = SubJetInfo.CombinedSVBJetTags[iSubJet1];
+              float csv2 = SubJetInfo.CombinedSVBJetTags[iSubJet2];
+              Subjet_MaxPt = ( pt1 > pt2 ? pt1 : pt2 );
+              Subjet_MinPt = ( pt1 > pt2 ? pt2 : pt1 );
+              Subjet_MaxCSV = ( csv1 > csv2 ? csv1 : csv2 );
+              Subjet_MinCSV = ( csv1 > csv2 ? csv2 : csv1 );
+              Subjet_CSV_MaxPt = ( pt1 > pt2 ? csv1 : csv2 );
+              Subjet_CSV_MinPt = ( pt1 > pt2 ? csv2 : csv1 );
+              //Subjet_DR = 
+              int ibindex = bJetsIndex[ibi];
+	      bJet_CSV = JetInfo.CombinedSVBJetTags[ibi];
+
+            } // -------------------
 
           }
-
+	  ++ihigi;
         } //// Reconstruct b' candidates
 
         //// Fill the tree
         final_nHiggsJets = higgsJets.size();
         final_nBJets = bJets.size();
-        final_HiggsJets_pt =  maxHig;
+        final_HiggsJets_pt = maxHig;
         final_BJets_pt = Bpt;
-        final_HiggsJets_eta =  maxHigEta;
+        final_HiggsJets_eta = maxHigEta;
         final_BJets_eta = BEta;
         final_HT = HT;
         final_evtwt = evtwt_;
+	final_AK5HT = AK5HT;
+	final_HiggsJets_phi = maxHigPhi;
+	final_BJets_phi = BPhi;
+	final_DR_bHiggs = DR_bHiggs;
+	final_Bprime_mass = maxHigBmass;
+	final_HJet_Mass = HJet_Mass;
+	final_HJet_PrunedMass = HJet_PrunedMass;
+	final_HJet_Nsubjetiness = HJet_Nsubjetiness;
+	final_Subjet_MaxPt = Subjet_MaxPt;
+	final_Subjet_MinPt = Subjet_MinPt;
+	final_Subjet_CSV_MaxPt = Subjet_CSV_MaxPt;
+	final_Subjet_CSV_MinPt = Subjet_CSV_MinPt;
+	final_Subjet_MaxCSV = Subjet_MaxCSV;
+	final_Subjet_MinCSV = Subjet_MinCSV;
+	final_Subjet_DR = Subjet_DR;
+	final_bJet_CSV = bJet_CSV;
+
         // NOTE: Events with maxHig=0 and Bpt=0 have not passed the B' reconstruction.
         // NOTE: Use the final_evtwt to weight events in the TMVA macro.
 
