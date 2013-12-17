@@ -135,6 +135,7 @@ class BprimeTobHDevelopment : public edm::EDAnalyzer {
     float evtwt_ ; 
     double puweight_ ;
 
+    bool genDecay_ ;
     bool doNminus1_ ;
     bool doAnalysis_ ;
     bool TriggerStudyOn_ ;
@@ -157,6 +158,9 @@ class BprimeTobHDevelopment : public edm::EDAnalyzer {
     TGraphAsymmErrors* TriggerEff_HiggsJetpT ;
     TGraphAsymmErrors* TriggerEff_JetpT ;
     TGraphAsymmErrors* TriggerEff_JetEta ;
+
+    TH1D* h_GenNumHiggsTobb ;
+    TH1D* h_DR_GenHjet ;
 
     TH1D* h_nHiggsJets_NoCuts ;
     TH1D* h_nBJets_NoCuts ;
@@ -250,11 +254,12 @@ BprimeTobHDevelopment::BprimeTobHDevelopment(const edm::ParameterSet& iConfig) :
   evtwt_(1),
   puweight_(1),
   jetPtPreselection_(30.),
-  doNminus1_(1),
+  genDecay_(1), // Note: This applies to any other set flag. 
+  doNminus1_(0),
   doAnalysis_(1),
-  TriggerStudyOn_(1), // Note: For this to be meaningful, the doAnalysis_ has to be set as well.
+  TriggerStudyOn_(0), // Note: For this to be meaningful, the doAnalysis_ has to be set as well.
                       // NOTE: When this is ohset, then the trigger bin in cutflow won't get filled. 
-  doTree_(1)
+  doTree_(0)
 { 
 
    if (doPUReweighting_) LumiWeights_ = edm::LumiReWeighting(file_PUDistMC_, file_PUDistData_, hist_PUDistMC_, hist_PUDistData_) ;
@@ -287,6 +292,9 @@ void BprimeTobHDevelopment::beginJob() {
   LepInfo.Register(chain_);
 
   if(maxEvents_<0 || maxEvents_>chain_->GetEntries()) maxEvents_ = chain_->GetEntries();
+
+  h_GenNumHiggsTobb	       = fs->make<TH1D>("h_nGenHiggsTobb"             ,"N_{Gen HiggsTobb}"             ,5  ,-0.5,4.5 );
+  h_DR_GenHjet		       = fs->make<TH1D>("h_DR_GenHjet"                ,"DR_{GenH,Hjet}"                ,100 ,0.  ,5.);
 
   h_nHiggsJets_NoCuts          = fs->make<TH1D>("h_nHJets_NoCuts"                  ,"N_{Higgs jets}"             ,11  ,-0.5,10.5 );
   h_nBJets_NoCuts              = fs->make<TH1D>("h_nBJets_NoCuts"                  ,"N_{b jets}"                 ,21  ,-0.5,20.5 );
@@ -374,6 +382,9 @@ void BprimeTobHDevelopment::beginJob() {
   CreateHistos("TrigStudySel"); //eleni
  
 
+  h_GenNumHiggsTobb -> Sumw2() ;
+  h_DR_GenHjet      -> Sumw2() ;
+
   h_nHiggsJets_NoCuts -> Sumw2() ;
   h_nBJets_NoCuts -> Sumw2() ;
   h_HT_NoCuts -> Sumw2() ;
@@ -452,6 +463,8 @@ void BprimeTobHDevelopment::beginJob() {
    tree->Branch("final_bJet_CSV", &final_bJet_CSV, "final_bJet_CSV/F");
 
    // Event shape and other advanced coolness
+   //tree->Branch("", &, "/F");
+
    //tree->Branch("", &, "/F");
 
   return ;  
@@ -542,7 +555,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     //std::vector<std::pair<int,TLorentzVector> > higgsJets ; 
     //std::vector<std::pair<int,TLorentzVector> > jets ; 
     //std::vector<std::pair<int,TLorentzVector> > bJets ; 
-    std::vector<TLorentzVector>bprimes ; 
+    std::vector<TLorentzVector> bprimes ; 
 
     int njets(0) ; 
     int  nGoodVtxs(0) ;
@@ -556,7 +569,6 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     if ( doPUReweighting_ && !isData_ ) puweight_ = LumiWeights_.weight(EvtInfo.TrueIT[0]) ;
     evtwt_ *= puweight_ ;
 
-    nGoodVtxs = 0 ;
     //// Select good vertices 
     for (int iVtx=0; iVtx < VtxInfo.Size; ++iVtx) {
       if (   VtxInfo.Type[iVtx]==1
@@ -566,6 +578,18 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
           && VtxInfo.z[iVtx]<24.) { ++nGoodVtxs ; }
     }
     if (nGoodVtxs < 1)  { cout << endl << "Vtx!" << endl; continue ; }
+
+    //// Select events with at least one H->bb decay 
+    if( genDecay_ ) {
+        int iHbb(0);
+        for( int igen=0; igen<GenInfo.Size; igen++){
+            if( GenInfo.Status[igen] != 3 || GenInfo.PdgID[igen] != 25 || GenInfo.nDa[igen] < 2) continue;
+            if( abs(GenInfo.Da0PdgID[igen])!=5 ) continue;
+	    if( GenInfo.Da0PdgID[igen]/GenInfo.Da1PdgID[igen]!=-1 ) continue;
+            iHbb++;
+        }
+        if( iHbb==0 ) continue;
+    }
 
     bool passHLT(false);
     for ( std::vector<int>::const_iterator ihlt = hltPaths_.begin(); ihlt != hltPaths_.end(); ++ihlt ) {
@@ -1381,6 +1405,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     std::vector<TLorentzVector>higgsJets ; 
     std::vector<TLorentzVector>jets ; 
     std::vector<TLorentzVector>bJets ; 
+    std::vector<TLorentzVector>GenHiggsbb ;
     //std::vector<std::pair<int,TLorentzVector> > higgsJets ; 
     //std::vector<std::pair<int,TLorentzVector> > jets ; 
     //std::vector<std::pair<int,TLorentzVector> > bJets ; 
@@ -1409,6 +1434,22 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
           && VtxInfo.z[iVtx]<24.) { ++nGoodVtxs ; }
     }
     if (nGoodVtxs < 1)  { edm::LogInfo("NoGoodPrimaryVertex") << " No good primary vertex " ; continue ; }
+
+    //// Select events with at least one H->bb decay 
+    int iHbb(0);
+    for( int igen=0; igen<GenInfo.Size; igen++){
+	//if( GenInfo.PdgID[igen] == 25 ) cout << endl << "  " << igen <<*/ ".) " << GenInfo.Status[igen] << ". " 
+	//<< GenInfo.PdgID[igen] << ": " << GenInfo.Da0PdgID[igen] << ", " << GenInfo.Da1PdgID[igen];
+        if( GenInfo.Status[igen] != 3 || GenInfo.PdgID[igen] != 25 || GenInfo.nDa[igen] < 2) continue;
+        if( abs(GenInfo.Da0PdgID[igen])!=5 ) continue;
+        if( GenInfo.Da0PdgID[igen]/GenInfo.Da1PdgID[igen]!=-1 ) continue;
+        iHbb++;
+	TLorentzVector genH_p4;
+	genH_p4.SetPtEtaPhiM(GenInfo.Pt[igen], GenInfo.Eta[igen], GenInfo.Phi[igen], GenInfo.Mass[igen]);
+        GenHiggsbb.push_back(genH_p4) ;
+    }
+    h_GenNumHiggsTobb->Fill(iHbb, evtwt_*puweight_); 
+    if( iHbb==0 && genDecay_ ) continue;
 
     h_cutflow -> Fill("AllEvents", 1) ; 
     FillHisto(TString("AllEvents")+TString("_nPVtx_NoPUWt"), nGoodVtxs, evtwt_) ; 
@@ -1560,7 +1601,15 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
            FillHisto(TString("TriggerSel")+TString("_HiggsJet_Eta")  ,fatjet_p4.Eta() ,evtwt_)  ;
            FillHisto(TString("TriggerSel")+TString("_HiggsJet_Mass") ,fatjet_p4.Mag() ,evtwt_)  ;
 
- 	   higgsJets.push_back(fatjet_p4) ;
+	   float DRgh(5.);
+	   for (std::vector<TLorentzVector>::const_iterator igenH = GenHiggsbb.begin(); igenH != GenHiggsbb.end(); ++igenH) {
+	     if( fatjet_p4.DeltaR(*igenH) < DRgh )
+               DRgh = fatjet_p4.DeltaR(*igenH);
+	   }
+	   h_DR_GenHjet->Fill(DRgh ,evtwt_);
+
+	   if ( !genDecay_ || ( genDecay_ && DRgh < 0.5 ) )
+	        higgsJets.push_back(fatjet_p4) ;
 
         } //// Higgs tagging
 
@@ -1589,7 +1638,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
       for (std::vector<TLorentzVector>::const_iterator ihig = higgsJets.begin(); ihig != higgsJets.end(); ++ihig) {
         if (jet_p4.DeltaR(*ihig) < 1.2) {
           isJetNotHiggs = false ; 
-          break ; 
+           break ; 
         }
         else {
           isJetNotHiggs = true ; 
@@ -1781,6 +1830,19 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     }
     if (nGoodVtxs < 1)  { edm::LogInfo("NoGoodPrimaryVertex") << " No good primary vertex " ; continue ; }
 
+    //// Select events with at least one H->bb decays
+    if( genDecay_ ) {
+        int iHbb(0);
+        for( int igen=0; igen<GenInfo.Size; igen++){
+            if( GenInfo.Status[igen] != 3 || GenInfo.PdgID[igen] != 25 || GenInfo.nDa[igen] < 2) continue;
+            if( abs(GenInfo.Da0PdgID[igen])!=5 ) continue;
+            if( GenInfo.Da0PdgID[igen]/GenInfo.Da1PdgID[igen]!=-1 ) continue;
+            iHbb++;
+        }
+        if( iHbb==0 ) continue;
+    }
+
+
     for ( std::vector<int>::const_iterator ihlt = hltPaths_.begin(); ihlt != hltPaths_.end(); ++ihlt ) { 
       if (EvtInfo.TrgBook[*ihlt] == 1) { 
          passHLT = true ; 
@@ -1816,7 +1878,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
         continue; //// apply jet pT cut
       if ( fabs(FatJetInfo.Eta[ifatjet]) > fatJetAbsEtaMax_ ) 
         continue; //// apply jet eta cut
-      if ( FatJetInfo.MassPruned[ifatjet] < fatJetPrunedMassMin_ 
+      if ( FatJetInfo.MassPruned[ifatjet] < 50. //eleni fatJetPrunedMassMin_ 
           || FatJetInfo.MassPruned[ifatjet] > fatJetPrunedMassMax_ ) 
         continue; //// apply pruned jet mass cut 
       retca8.set(false);
@@ -1851,16 +1913,16 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
 
 
        //// Selecting fat jets
-      if (fatjet_p4.Mag() > fatJetMassMin_ 
-          && fatjet_p4.Mag() < fatJetMassMax_ 
-          && FatJetInfo.tau2[ifatjet]/FatJetInfo.tau1[ifatjet] < fatJetTau2ByTau1Max_) {
+      if (fatjet_p4.Mag() > 75.) { //elenifatJetMassMin_ 
+//eleni          && fatjet_p4.Mag() < fatJetMassMax_ ) { 
+//eleni          && FatJetInfo.tau2[ifatjet]/FatJetInfo.tau1[ifatjet] < fatJetTau2ByTau1Max_) {
 
 	  fatJets.push_back(fatjet_p4) ;
 
          //// Higgs tagging
-         if ( SubJetInfo.CombinedSVBJetTags[iSubJet1] > subjet1CSVDiscMin_ 
+         if ( SubJetInfo.CombinedSVBJetTags[iSubJet1] >= 0. //eleni > subjet1CSVDiscMin_ 
           && SubJetInfo.CombinedSVBJetTags[iSubJet1] < subjet1CSVDiscMax_ 
-          && SubJetInfo.CombinedSVBJetTags[iSubJet2] > subjet2CSVDiscMin_ 
+          && SubJetInfo.CombinedSVBJetTags[iSubJet2] >= 0. //eleni > subjet2CSVDiscMin_ 
           && SubJetInfo.CombinedSVBJetTags[iSubJet2] < subjet2CSVDiscMax_) {
 
  	   higgsJets.push_back(fatjet_p4) ;
