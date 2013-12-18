@@ -1611,12 +1611,14 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
            FillHisto(TString("TriggerSel")+TString("_HiggsJet_Eta")  ,fatjet_p4.Eta() ,evtwt_)  ;
            FillHisto(TString("TriggerSel")+TString("_HiggsJet_Mass") ,fatjet_p4.Mag() ,evtwt_)  ;
 
-	   float DRgh(5.);
-	   for (std::vector<TLorentzVector>::const_iterator igenH = GenHiggsbb.begin(); igenH != GenHiggsbb.end(); ++igenH) {
-	     if( fatjet_p4.DeltaR(*igenH) < DRgh )
-               DRgh = fatjet_p4.DeltaR(*igenH);
+           float DRgh(5.);
+           if ( genDecay_ ) {
+  	     for (std::vector<TLorentzVector>::const_iterator igenH = GenHiggsbb.begin(); igenH != GenHiggsbb.end(); ++igenH) {
+	       if( fatjet_p4.DeltaR(*igenH) < DRgh )
+                 DRgh = fatjet_p4.DeltaR(*igenH);
+	     }
+	     h_DR_GenHjet->Fill(DRgh ,evtwt_);
 	   }
-	   h_DR_GenHjet->Fill(DRgh ,evtwt_);
 
 	   if ( !genDecay_ || ( genDecay_ && DRgh < 0.5 ) )
 	        higgsJets.push_back(fatjet_p4) ;
@@ -1855,6 +1857,7 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
     std::vector<TLorentzVector>jets ; 
     std::vector<TLorentzVector>bJets ; 
     std::vector<int>bJetsIndex ;
+    std::vector<TLorentzVector>GenHiggsbb ;
     //std::vector<std::pair<int,TLorentzVector> > higgsJets ; 
     //std::vector<std::pair<int,TLorentzVector> > jets ; 
     //std::vector<std::pair<int,TLorentzVector> > bJets ; 
@@ -1892,6 +1895,9 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
             if( abs(GenInfo.Da0PdgID[igen])!=5 ) continue;
             if( GenInfo.Da0PdgID[igen]/GenInfo.Da1PdgID[igen]!=-1 ) continue;
             iHbb++;
+            TLorentzVector genH_p4;
+            genH_p4.SetPtEtaPhiM(GenInfo.Pt[igen], GenInfo.Eta[igen], GenInfo.Phi[igen], GenInfo.Mass[igen]);
+            GenHiggsbb.push_back(genH_p4) ;
         }
         if( iHbb==0 ) continue;
     }
@@ -1979,8 +1985,19 @@ void BprimeTobHDevelopment::analyze(const edm::Event& iEvent, const edm::EventSe
           && SubJetInfo.CombinedSVBJetTags[iSubJet2] >= 0. //eleni > subjet2CSVDiscMin_ 
           && SubJetInfo.CombinedSVBJetTags[iSubJet2] < subjet2CSVDiscMax_) {
 
- 	   higgsJets.push_back(fatjet_p4) ;
-	   higgsJetsIndex.push_back(ifatjet) ;
+           float DRgh(5.);
+	   if ( genDecay_ ) {
+             for (std::vector<TLorentzVector>::const_iterator igenH = GenHiggsbb.begin(); igenH != GenHiggsbb.end(); ++igenH) {
+               if( fatjet_p4.DeltaR(*igenH) < DRgh )
+                 DRgh = fatjet_p4.DeltaR(*igenH);
+             }
+             h_DR_GenHjet->Fill(DRgh ,evtwt_);
+	   }
+
+           if ( !genDecay_ || ( genDecay_ && DRgh < 0.5 ) ) {
+             higgsJets.push_back(fatjet_p4) ;
+	     higgsJetsIndex.push_back(ifatjet) ;
+	   }
 
         } //// Higgs tagging
 
