@@ -2,14 +2,11 @@ import FWCore.ParameterSet.Config as cms
 
 from FWCore.ParameterSet.VarParsing import VarParsing
 
-#from BprimebHAnalysis.BprimeTobHAnalysis.bprimetobhanalysis_cfi import *
-#from BprimebHAnalysis.BprimeTobHAnalysis.TTJets_Hadronic.TTJets_Hadronic_00_cfi import *
-#from BprimebHAnalysis.BprimeTobHAnalysis.BpBpToBHTWinc.BprimeBprimeTobHtWinc_M_1000_cfi import *
-from Bprime_kit.BprimeTobHDevelopment.BpBpToBHTWinc.BprimeBprimeTobHtWinc_M_1000_cfi import *
+####from BpbH.BprimeTobHDevelopment.BpBpToBHBHinc.BprimeBprimeTobHbHinc_M_1000_cfi import * 
 
 options = VarParsing('python')
 
-options.register('outFilename', 'file.root',
+options.register('outFilename', 'Dec17_bprimeTobH_test.root',
     VarParsing.multiplicity.singleton,
     VarParsing.varType.string,
     "Output file name"
@@ -99,11 +96,40 @@ options.register('hTMax', 1.E6,
     VarParsing.varType.float,
     "Maximum HT"
     )
-
 options.register('doPUReweighting', True,
      VarParsing.multiplicity.singleton,
      VarParsing.varType.bool,
      "Do pileup reweighting"
+     )
+options.register('genDecay', True,
+     VarParsing.multiplicity.singleton,
+     VarParsing.varType.bool,
+     "Match H->bb with gen info"
+     )
+options.register('doNminus1', False,
+     VarParsing.multiplicity.singleton,
+     VarParsing.varType.bool,
+     "Do N-1 selection"
+     )
+options.register('doAnalysis', True,
+     VarParsing.multiplicity.singleton,
+     VarParsing.varType.bool,
+     "Do analysis"
+     )
+options.register('TriggerStudyOn', False,
+     VarParsing.multiplicity.singleton,
+     VarParsing.varType.bool,
+     "Do trigger studies"
+     )
+options.register('MuTriggerStudyOn', False,
+     VarParsing.multiplicity.singleton,
+     VarParsing.varType.bool,
+     "Select events passing the muon triggers"
+     )
+options.register('doTree', False,
+     VarParsing.multiplicity.singleton,
+     VarParsing.varType.bool,
+     "Fill tree"
      )
  
 options.setDefault('maxEvents', -1000) 
@@ -126,19 +152,26 @@ process.TFileService = cms.Service("TFileService",
     fileName = cms.string(options.outFilename) 
     )
 
+MuHLTPaths  = [1830, 1831, 2290, 2650, 2912, 3313, 3590, 4875, 5201, 5671, ] #HLT_Mu40
+HLTPaths  = [3225, 4136, 4137, 5089, 5537, 5538] #HLT_HT750
+#HLTPaths = [4457, 4458, 4459, 4893, 5703]       #HLT_PFHT750
+#HLTPaths = [4469, 4470, 4471, 5222, 5710, 5711] #HLT_PFJet320
+#HLTPaths = [3379, 4637, 4638, 5292, 5763]       #HLT_QuadJet90
+#HLTPaths = [4213, 4214, 4833, 5115, 5579]       #HLT_Jet160Eta2p4_Jet120Eta2p4_DiBTagIP3DFastPVLoose
+
 process.BprimebHDevelopment = cms.EDAnalyzer('BprimeTobHDevelopment',
     MaxEvents           = cms.int32(options.maxEvents),
     ReportEvery         = cms.int32(options.reportEvery),  
     InputTTree          = cms.string('ntuple/tree'),
-#    InputFiles          = cms.vstring(FileNames), 
-    InputFiles          = cms.vstring("root://eoscms//eos/cms/store/user/devdatta/NtuplesBprimeTobH_v1/BprimeBprimeToBHBHinc_M-500_TuneZ2star_8TeV-madgraph/BprimeTobH_v1_10_1_wRI.root"),
-
-    HLTPaths            = cms.vint32(3225,4893), #(3225,4136,4137,5089,5537,5538),
-    DoPUReweighting	= cms.bool(options.doPUReweighting),
-    File_PUDistMC	= cms.string('pileup_Data_Summer12_53X_S10.root'),
-    File_PUDistData	= cms.string('pileup_Data_Summer12_53X_S10.root'),
-    Hist_PUDistMC	= cms.string('pileup_mc'),
-    Hist_PUDistData	= cms.string('pileup_data'),
+####    InputFiles          = cms.vstring(FileNames),
+    InputFiles          = cms.vstring("root://eoscms//eos/cms/store/user/devdatta/NtuplesBprimeTobH_v1/BprimeBprimeToBHBHinc_M-800_TuneZ2star_8TeV-madgraph/BprimeTobH_v1_10_1_xsR.root"),
+    MuHLTPaths            = cms.vint32(MuHLTPaths), 
+    HLTPaths            = cms.vint32(HLTPaths), 
+    DoPUReweighting	    = cms.bool(options.doPUReweighting),
+    File_PUDistMC	      = cms.string('pileup_Data_Summer12_53X_S10.root'),
+    File_PUDistData	    = cms.string('pileup_Data_Summer12_53X_S10.root'),
+    Hist_PUDistMC	      = cms.string('pileup_mc'),
+    Hist_PUDistData	    = cms.string('pileup_data'),
     JetPtMin            = cms.double(options.jetPtMin),
     JetPtMax            = cms.double(options.jetPtMax),
     JetAbsEtaMax        = cms.double(2.4),
@@ -157,6 +190,12 @@ process.BprimebHDevelopment = cms.EDAnalyzer('BprimeTobHDevelopment',
     Subjet2CSVDiscMax   = cms.double(options.subjet2CSVDiscMax),
     HTMin               = cms.double(options.hTMin),
     HTMax               = cms.double(options.hTMax), 
+    GenDecay		= cms.bool(options.genDecay),
+    DoNminus1           = cms.bool(options.doNminus1),
+    DoAnalysis          = cms.bool(options.doAnalysis),
+    TriggerStudyOn      = cms.bool(options.TriggerStudyOn),
+    MuTriggerStudyOn    = cms.bool(options.MuTriggerStudyOn),
+    DoTree              = cms.bool(options.doTree), 
     ) 
 
 process.p = cms.Path(process.BprimebHDevelopment)
